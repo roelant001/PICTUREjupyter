@@ -41,6 +41,7 @@
         vars:
           packages:
           - jupyterlab==3.0.10
+          - jupyter-packaging
           - jupyterlab-git
           - jupyterlab-system-monitor
           - jupyterlab-lsp
