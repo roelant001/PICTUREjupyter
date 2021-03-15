@@ -1,4 +1,4 @@
-- name: Install and configure Jupyter-lab-extension
+- name: Install and configure Jupyter
   hosts:
     - localhost
   gather_facts: false
@@ -13,7 +13,21 @@
     - name: Ubuntu
       when: ansible_distribution == 'Ubuntu'
       block:
-      - name: Update nodejs ppa installer
+      - name: Install required packages
+        package:
+          name:
+          - apt-transport-https
+          - python
+          - python-setuptools
+          - python-pip
+          - python3
+          - python3-setuptools
+          - python3-pip
+          - jq
+          - curl
+          state: present
+
+      - name: Download nodejs ppa installer
         get_url:
           url: https://deb.nodesource.com/setup_14.x
           dest: /tmp/nodejs-installer.sh
@@ -31,10 +45,10 @@
         apt:
           name: "{{ packages }}"
           allow_unauthenticated: yes
-          upgrade: yes
         vars:
           packages:
           - nodejs
+
       - name: Ensure python 3 packages for Jupyter are installed
         pip:
           name: "{{ packages }}"
@@ -58,8 +72,71 @@
           - matplotlib
           - cmdstanpy
           - xnat
+          - jupyterhub==0.9.4
+          - virtualenv==16.0.0
       - name: Execute jupyterlab build
         command: jupyter lab build
+        
+      - name: Ensure configurable-http-proxy is installed
+        npm:
+          global: yes
+          name: configurable-http-proxy
+
+      - name: Ensure Jupyter configuration directory exists
+        file:
+          path: /etc/jupyterhub/
+          state: directory
+
+      - name: Ensure systemd directory exists
+        file:
+          path: /usr/lib/systemd/system
+          state: directory
+
+      - name: Create nginx location block
+        copy:
+          dest: /etc/nginx/app-location-conf.d/jupyterhub.conf
+          mode: 0644
+          content: |
+            location / {
+                proxy_pass http://127.0.0.1:8000;
+                proxy_redirect http://localhost:8000/ $scheme://$host/;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+            }
+
+      - name: Restart nginx
+        service:
+          name: nginx
+          state: restarted
+
+      - name: Ensure jupyter configuration is in place
+        copy:
+          dest: /etc/jupyterhub/jupyterhub_config.py
+          content: |
+            c.Spawner.default_url = '/lab'
+            c.Spawner.notebook_dir = '~'
+            c.Authenticator.admin_users = {'{{ ssh_user | default('ubuntu', true) }}'}
+
+      - name: Ensure jupyter systemd config is in place
+        copy:
+          dest: /usr/lib/systemd/system/jupyterhub.service
+          content: |
+            [Unit]
+            Description=Jypyter Hub daemon
+            After=network.target
+
+            [Service]
+            Type=simple
+            ExecStart=/usr/local/bin/jupyterhub --config=/etc/jupyterhub/jupyterhub_config.py
+            Restart=on-failure
+            RestartSec=42s
+
+            [Install]
+            WantedBy=multi-user.target
+
       - name: Reload jupyterhub service
         systemd:
           state: restarted
