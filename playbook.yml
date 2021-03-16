@@ -45,7 +45,7 @@
           executable: pip3
         vars:
           packages:
-          - jupyterlab==3.0.10
+          - jupyterlab==2.2.0
           - jupyterlab-git
           - jupyterlab-system-monitor
           - jupyterlab-lsp
