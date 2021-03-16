@@ -50,7 +50,6 @@
           - jupyterlab-system-monitor
           - jupyterlab-lsp
           - python-language-server[all]
-          - lckr-jupyterlab-variableinspector
           - ipywidgets
           - tqdm
           - antspyx
