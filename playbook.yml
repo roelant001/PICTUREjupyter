@@ -33,9 +33,11 @@
       pip:
         name: "{{ packages }}"
         executable: pip3
+        extra_args: "--upgrade"
       vars:
         packages:
         - jupyterlab==2.2.0
+        - jupyterhub
         - jupyterlab-git
         - jupyterlab-system-monitor
         - jupyterlab-lsp
@@ -53,3 +55,17 @@
         - xnat
     - name: Execute jupyterlab build
       command: jupyter labextension update --all
+    - name: Execute jupyterlab build
+      command: jupyter build
+    - name: Reload jupyterhub service
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: jupyterhub
+
+    - name: Ensure Jupyterhub is started
+      register: start_jupyterhub
+      service:
+        name: jupyterhub
+        state: restarted
+        enabled: yes
