@@ -53,5 +53,3 @@
         - xnat
     - name: Execute jupyterlab build
       command: jupyter labextension update --all
-    - name: Unconditionally reboot the machine with all defaults
-      reboot:
