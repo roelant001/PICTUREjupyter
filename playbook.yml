@@ -3,79 +3,55 @@
     - localhost
   gather_facts: false
   tasks:
-    - name: Wait for system to become reachable
-      wait_for_connection:
-        timeout: 300
+    - name: Update nodejs ppa installer
+      get_url:
+        url: https://deb.nodesource.com/setup_14.x
+        dest: /tmp/nodejs-installer.sh
+        mode: 0755
 
-    - name: Gather facts for first time
-      setup:
+    - name: Execute nodejs ppa installer
+      command: /tmp/nodejs-installer.sh
 
-    - name: Ubuntu
-      when: ansible_distribution == 'Ubuntu'
-      block:
-      - name: Update nodejs ppa installer
-        get_url:
-          url: https://deb.nodesource.com/setup_14.x
-          dest: /tmp/nodejs-installer.sh
-          mode: 0755
+    - name: Remove nodejs ppa installer
+      file:
+        path: /tmp/nodejs-installer.sh
+        state: absent
 
-      - name: Execute nodejs ppa installer
-        command: /tmp/nodejs-installer.sh
-
-      - name: Remove nodejs ppa installer
-        file:
-          path: /tmp/nodejs-installer.sh
-          state: absent
-
-      - name: Install NodeJS
-        apt:
-          name: "{{ packages }}"
-          allow_unauthenticated: yes
-        vars:
-          packages:
-          - nodejs
-      - name: Update and upgrade apt packages
-        become: true
-        apt:
-          update_cache: yes
-          upgrade: yes
-      - name: Ensure python 3 packages for Jupyter are installed
-        pip:
-          name: "{{ packages }}"
-          executable: pip3
-        vars:
-          packages:
-          - jupyterlab==2.2.0
-          - jupyterlab-git
-          - jupyterlab-system-monitor
-          - jupyterlab-lsp
-          - python-language-server[all]
-          - ipywidgets
-          - tqdm
-          - antspyx
-          - wget
-          - simpleitk
-          - numpy
-          - pandas
-          - arviz
-          - matplotlib
-          - cmdstanpy
-          - xnat
-      - name: Execute jupyterlab build
-        command: jupyter lab build
-      - name: Reload jupyterhub service
-        systemd:
-          state: restarted
-          daemon_reload: yes
-          name: jupyterhub
-
-      - name: Ensure Jupyterhub is started
-        register: start_jupyterhub
-        service:
-          name: jupyterhub
-          state: restarted
-          enabled: yes
-
-      - debug:
-          msg: 'service_url: {"url": "https://{{ ansible_host }}", "tag": "web", "description": "Jupyter"}'
-        when: (start_jupyterhub is succeeded)
+    - name: Install NodeJS
+      apt:
+        name: "{{ packages }}"
+        allow_unauthenticated: yes
+      vars:
+        packages:
+        - nodejs
+    - name: Update and upgrade apt packages
+      become: true
+      apt:
+        update_cache: yes
+        upgrade: yes
+    - name: Ensure python 3 packages for Jupyter are installed
+      pip:
+        name: "{{ packages }}"
+        executable: pip3
+      vars:
+        packages:
+        - jupyterlab==2.2.0
+        - jupyterlab-git
+        - jupyterlab-system-monitor
+        - jupyterlab-lsp
+        - python-language-server[all]
+        - ipywidgets
+        - tqdm
+        - antspyx
+        - wget
+        - simpleitk
+        - numpy
+        - pandas
+        - arviz
+        - matplotlib
+        - cmdstanpy
+        - xnat
+    - name: Execute jupyterlab build
+      command: jupyter labextension update --all
+    - name: Unconditionally reboot the machine with all defaults
+      reboot:
