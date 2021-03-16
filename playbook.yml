@@ -29,6 +29,14 @@
       apt:
         update_cache: yes
         upgrade: yes
+    - name: Update pip
+      pip:
+        name: "{{ packages }}"
+        executable: pip3
+        extra_args: "--upgrade"
+      vars:
+        packages:
+        - pip
     - name: Ensure python 3 packages for Jupyter are installed
       pip:
         name: "{{ packages }}"
