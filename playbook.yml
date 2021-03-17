@@ -51,7 +51,7 @@
       - name: update pip
         command: pip3 install pip --upgrade
       - name: Install python 3 packages for Jupyter are installed
-        command: pip3 install jupyterlab==2.2.0 jupyterhub jupyterlab-git jupyterlab-system-monitor jupyterlab-lsp sqlalchemy flask-sqlalchemy python-language-server[all] lckr-jupyterlab-variableinspector ipywidgets tqdm antspyx wget simpleitk numpy pandas arviz matplotlib xnat virtualenv --upgrade
+        command: pip3 install jupyterlab==2.2.0 jupyterhub jupyterlab-git jupyterlab-system-monitor jupyterlab-lsp sqlalchemy flask-sqlalchemy python-language-server[all] lckr-jupyterlab-variableinspector ipywidgets tqdm antspyx wget simpleitk numpy pandas arviz matplotlib xnat virtualenv --upgrade --use-deprecated=legacy-resolver
 
       - name: Execute jupyterlab update
         command: jupyter labextension update --all
