@@ -56,7 +56,7 @@
       - name: Execute jupyterlab update
         command: jupyter labextension update --all
       - name: Execute jupyterlab build
-        command: jupyter labextension build
+        command: jupyter lab build
       - name: Ensure configurable-http-proxy is installed
         npm:
           global: yes
