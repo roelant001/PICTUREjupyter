@@ -1,79 +1,135 @@
-- name: Install and configure Jupyter-lab-extension
+- name: Install and configure Jupyter
   hosts:
     - localhost
   gather_facts: false
   tasks:
-    - name: Update nodejs ppa installer
-      get_url:
-        url: https://deb.nodesource.com/setup_14.x
-        dest: /tmp/nodejs-installer.sh
-        mode: 0755
+    - name: Wait for system to become reachable
+      wait_for_connection:
+        timeout: 300
 
-    - name: Execute nodejs ppa installer
-      command: /tmp/nodejs-installer.sh
+    - name: Gather facts for first time
+      setup:
 
-    - name: Remove nodejs ppa installer
-      file:
-        path: /tmp/nodejs-installer.sh
-        state: absent
+    - name: Ubuntu
+      when: ansible_distribution == 'Ubuntu'
+      block:
+      - name: Install required packages
+        package:
+          name:
+          - apt-transport-https
+          - python
+          - python-setuptools
+          - python-pip
+          - python3
+          - python3-setuptools
+          - python3-pip
+          - jq
+          - curl
+          state: present
 
-    - name: Install NodeJS
-      apt:
-        name: "{{ packages }}"
-        allow_unauthenticated: yes
-      vars:
-        packages:
-        - nodejs
-    - name: Update and upgrade apt packages
-      become: true
-      apt:
-        update_cache: yes
-        upgrade: yes
-    - name: Update pip
-      pip:
-        name: "{{ packages }}"
-        executable: pip3
-        extra_args: "--upgrade"
-      vars:
-        packages:
-        - pip
-    - name: Ensure python 3 packages for Jupyter are installed
-      pip:
-        name: "{{ packages }}"
-        executable: pip3
-        extra_args: "--upgrade"
-      vars:
-        packages:
-        - jupyterlab==2.2.0
-        - jupyterhub
-        - jupyterlab-git
-        - jupyterlab-system-monitor
-        - jupyterlab-lsp
-        - python-language-server[all]
-        - ipywidgets
-        - tqdm
-        - antspyx
-        - wget
-        - simpleitk
-        - numpy
-        - pandas
-        - arviz
-        - matplotlib
-        - cmdstanpy
-        - xnat
-    - name: Execute jupyterlab build
-      command: jupyter labextension update --all
-    - name: Execute jupyterlab build
-      command: jupyter build
-    - name: Reload jupyterhub service
-      systemd:
-        state: restarted
-        daemon_reload: yes
-        name: jupyterhub
+      - name: Download nodejs ppa installer
+        get_url:
+          url: https://deb.nodesource.com/setup_14.x
+          dest: /tmp/nodejs-installer.sh
+          mode: 0755
 
-    - name: Ensure Jupyterhub is started
-      register: start_jupyterhub
-      service:
-        name: jupyterhub
-        state: restarted
-        enabled: yes
+      - name: Execute nodejs ppa installer
+        command: /tmp/nodejs-installer.sh
+
+      - name: Remove nodejs ppa installer
+        file:
+          path: /tmp/nodejs-installer.sh
+          state: absent
+
+      - name: Install NodeJS
+        apt:
+          name: "{{ packages }}"
+          allow_unauthenticated: yes
+        vars:
+          packages:
+          - nodejs
+      - name: update pip
+        command: pip3 install pip --upgrade
+      - name: Install python 3 packages for Jupyter are installed
+        command: pip3 install jupyterlab==2.2.0 jupyterhub jupyterlab-git jupyterlab-system-monitor jupyterlab-lsp sqlalchemy flask-sqlalchemy python-language-server[all] lckr-jupyterlab-variableinspector ipywidgets tqdm antspyx wget simpleitk numpy pandas arviz matplotlib xnat virtualenv --upgrade
+
+      - name: Execute jupyterlab update
+        command: jupyter labextension update --all
+      - name: Execute jupyterlab build
+        command: jupyter labextension build
+      - name: Ensure configurable-http-proxy is installed
+        npm:
+          global: yes
+          name: configurable-http-proxy
+
+      - name: Ensure Jupyter configuration directory exists
+        file:
+          path: /etc/jupyterhub/
+          state: directory
+
+      - name: Ensure systemd directory exists
+        file:
+          path: /usr/lib/systemd/system
+          state: directory
+
+      - name: Create nginx location block
+        copy:
+          dest: /etc/nginx/app-location-conf.d/jupyterhub.conf
+          mode: 0644
+          content: |
+            location / {
+                proxy_pass http://127.0.0.1:8000;
+                proxy_redirect http://localhost:8000/ $scheme://$host/;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+            }
+
+      - name: Restart nginx
+        service:
+          name: nginx
+          state: restarted
+
+      - name: Ensure jupyter configuration is in place
+        copy:
+          dest: /etc/jupyterhub/jupyterhub_config.py
+          content: |
+            c.Spawner.default_url = '/lab'
+            c.Spawner.notebook_dir = '~'
+            c.Authenticator.admin_users = {'{{ ssh_user | default('ubuntu', true) }}'}
+
+      - name: Ensure jupyter systemd config is in place
+        copy:
+          dest: /usr/lib/systemd/system/jupyterhub.service
+          content: |
+            [Unit]
+            Description=Jypyter Hub daemon
+            After=network.target
+
+            [Service]
+            Type=simple
+            ExecStart=/usr/local/bin/jupyterhub --config=/etc/jupyterhub/jupyterhub_config.py
+            Restart=on-failure
+            RestartSec=42s
+
+            [Install]
+            WantedBy=multi-user.target
+
+      - name: Reload jupyterhub service
+        systemd:
+          state: restarted
+          daemon_reload: yes
+          name: jupyterhub
+
+      - name: Ensure Jupyterhub is started
+        register: start_jupyterhub
+        service:
+          name: jupyterhub
+          state: restarted
+          enabled: yes
+
+      - debug:
+          msg: 'service_url: {"url": "https://{{ ansible_host }}", "tag": "web", "description": "Jupyter"}'
+        when: (start_jupyterhub is succeeded)
