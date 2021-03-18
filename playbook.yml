@@ -18,7 +18,9 @@
         state: absent
 
     - name: update nodejs
-      command: apt-get update && apt-get install nodejs --upgrade
+      command: apt-get update 
+    - name: update nodejs2
+      command: apt-get install nodejs --upgrade
     - name: update pip
       command: pip3 install pip --upgrade
     - name: Install python 3 packages for Jupyter are installed
