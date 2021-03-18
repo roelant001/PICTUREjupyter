@@ -46,4 +46,3 @@
 
     - debug:
         msg: 'service_url: {"url": "https://{{ ansible_host }}", "tag": "web", "description": "Jupyter"}'
-      when: (start_jupyterhub is succeeded)
